@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vantage Hall Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; background: transparent; }
+        .chat-container { width: 100%; height: 100vh; background: white; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .chat-header { background: linear-gradient(135deg, #1a3a52 0%, #0d2436 100%); color: white; padding: 18px 20px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+        .chat-header-avatar { width: 48px; height: 48px; border-radius: 50%; background: white; overflow: hidden; flex-shrink: 0; border: 3px solid rgba(255,255,255,0.3); }
+        .chat-header-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .chat-header-info h3 { font-size: 17px; margin-bottom: 4px; }
+        .chat-header-info p { font-size: 12px; opacity: 0.95; display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; animation: statusBlink 2s ease-in-out infinite; box-shadow: 0 0 8px #4ade80; }
+        @keyframes statusBlink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .ai-badge { background: rgba(255,255,255,0.25); padding: 4px 10px; border-radius: 14px; font-size: 10px; font-weight: bold; margin-top: 4px; display: inline-block; }
+        .registration-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 10; display: flex; flex-direction: column; }
+        .registration-overlay.hidden { display: none; }
+        .registration-header { background: linear-gradient(135deg, #1a3a52 0%, #0d2436 100%); color: white; padding: 25px 20px; text-align: center; }
+        .registration-header h2 { font-size: 20px; margin-bottom: 8px; }
+        .registration-header p { font-size: 13px; opacity: 0.9; }
+        .registration-form { flex: 1; padding: 24px; overflow-y: auto; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 7px; font-size: 14px; font-weight: 600; color: #333; }
+        .form-group label .required { color: #d4536c; }
+        .form-group input { width: 100%; padding: 12px 14px; border: 2px solid #e5e5e5; border-radius: 10px; font-size: 14px; outline: none; transition: all 0.3s; }
+        .form-group input:focus { border-color: #1a3a52; box-shadow: 0 0 0 3px rgba(26,58,82,0.1); }
+        .form-group input.error { border-color: #d4536c; }
+        .error-message { color: #d4536c; font-size: 12px; margin-top: 5px; display: none; }
+        .error-message.show { display: block; }
+        .submit-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #1a3a52 0%, #0d2436 100%); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(26,58,82,0.4); }
+        .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .form-note { text-align: center; font-size: 12px; color: #666; margin-top: 14px; padding: 12px; background: #f9f9f9; border-radius: 8px; }
+        .loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .chat-messages { flex: 1; padding: 16px; overflow-y: auto; background: linear-gradient(to bottom, #f9f9f9 0%, #fff 100%); }
+        .chat-messages::-webkit-scrollbar { width: 5px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 10px; }
+        .message { margin-bottom: 12px; display: flex; animation: msgSlide 0.3s ease; }
+        @keyframes msgSlide { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        .message.bot { justify-content: flex-start; }
+        .message.user { justify-content: flex-end; }
+        .message-content { max-width: 78%; padding: 11px 15px; border-radius: 18px; font-size: 14px; line-height: 1.6; word-wrap: break-word; }
+        .message.bot .message-content { background: white; color: #333; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0; }
+        .message.user .message-content { background: linear-gradient(135deg, #1a3a52 0%, #0d2436 100%); color: white; border-bottom-right-radius: 4px; }
+        .quick-replies { padding: 10px 14px; background: white; border-top: 1px solid #e5e5e5; display: flex; gap: 7px; flex-wrap: wrap; flex-shrink: 0; max-height: 85px; overflow-y: auto; }
+        .quick-reply-btn { padding: 7px 13px; background: #f9f9f9; border: 2px solid #e5e5e5; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; white-space: nowrap; font-weight: 500; }
+        .quick-reply-btn:hover { background: linear-gradient(135deg, #1a3a52 0%, #0d2436 100%); color: white; border-color: transparent; transform: translateY(-1px); }
+        .back-to-menu-btn { padding: 7px 13px; background: linear-gradient(135deg, #d4536c 0%, #b83e54 100%); border: none; border-radius: 20px; color: white; font-size: 12px; cursor: pointer; transition: all 0.3s; white-space: nowrap; font-weight: 600; display: none; }
+        .back-to-menu-btn.show { display: inline-block; }
+        .chat-input { padding: 12px 14px; background: white; border-top: 1px solid #e5e5e5; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+        .chat-input input { flex: 1; padding: 11px 15px; border: 2px solid #e5e5e5; border-radius: 22px; font-size: 14px; outline: none; transition: all 0.3s; }
+        .chat-input input:focus { border-color: #1a3a52; }
+        .chat-input input:disabled { background: #f5f5f5; cursor: not-allowed; }
+        .chat-input button { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #1a3a52 0%, #0d2436 100%); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; flex-shrink: 0; }
+        .chat-input button:hover:not(:disabled) { transform: scale(1.1); }
+        .chat-input button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .chat-input button svg { width: 19px; height: 19px; fill: white; }
+        .typing-indicator { display: none; padding: 11px 15px; background: white; border-radius: 18px; border-bottom-left-radius: 4px; max-width: 70px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0; }
+        .typing-indicator span { height: 8px; width: 8px; background: #1a3a52; border-radius: 50%; display: inline-block; margin-right: 4px; animation: typing 1.4s infinite; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; margin-right: 0; }
+        @keyframes typing { 0%,60%,100%{transform:translateY(0);opacity:0.7} 30%{transform:translateY(-8px);opacity:1} }
+    </style>
+</head>
+<body>
+<div class="chat-container">
+    <div class="registration-overlay" id="registrationOverlay">
+        <div class="registration-header">
+            <h2>✨ Welcome to Vantage Hall!</h2>
+            <p>Please share your details to start chatting</p>
+        </div>
+        <div class="registration-form">
+            <form id="userDetailsForm">
+                <div class="form-group">
+                    <label>Your Name <span class="required">*</span></label>
+                    <input type="text" id="userName" placeholder="Enter your full name" required>
+                    <div class="error-message" id="nameError">Please enter your name</div>
+                </div>
+                <div class="form-group">
+                    <label>Email Address <span class="required">*</span></label>
+                    <input type="email" id="userEmail" placeholder="example@email.com" required>
+                    <div class="error-message" id="emailError">Please enter a valid email</div>
+                </div>
+                <div class="form-group">
+                    <label>Phone Number <span class="required">*</span></label>
+                    <input type="tel" id="userPhone" placeholder="10-digit mobile number" required maxlength="10">
+                    <div class="error-message" id="phoneError">Please enter a valid 10-digit number</div>
+                </div>
+                <button type="submit" class="submit-btn" id="submitBtn">Start Chatting 🚀</button>
+                <div class="form-note">🔒 Your information is secure and will only be used to provide better assistance.</div>
+            </form>
+        </div>
+    </div>
+    <div class="chat-header">
+        <div class="chat-header-avatar">
+            <img src="https://tse4.mm.bing.net/th/id/OIP.ObhPteB_2loAm-xq-0Sw9AHaHa?cb=12&rs=1&pid=ImgDetMain" alt="Vantage Hall">
+        </div>
+        <div class="chat-header-info">
+            <h3>Vantage Hall Assistant</h3>
+            <p><span class="status-dot"></span>Online • Ready to help</p>
+            <span class="ai-badge">🤖 AI-POWERED</span>
+        </div>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+        <div class="message bot">
+            <div class="typing-indicator" id="typingIndicator">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    </div>
+    <div class="quick-replies" id="quickReplies">
+        <button class="back-to-menu-btn" id="backToMenuBtn">⬅️ Back to Menu</button>
+        <button class="quick-reply-btn" data-reply="faq">❓ FAQ</button>
+        <button class="quick-reply-btn" data-reply="emotional">💚 Emotional Support</button>
+        <button class="quick-reply-btn" data-reply="What is the admission process?">📝 Admissions</button>
+        <button class="quick-reply-btn" data-reply="Tell me about fee structure">💰 Fee Structure</button>
+        <button class="quick-reply-btn" data-reply="What are hostel facilities?">🏡 Hostel</button>
+        <button class="quick-reply-btn" data-reply="How can I contact you?">📞 Contact</button>
+    </div>
+    <div class="chat-input">
+        <input type="text" id="userInput" placeholder="Type your message..." disabled>
+        <button id="sendBtn" disabled>
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+    </div>
+</div>
+<script>
+const API_URL = "https://vantagehall.vercel.app/api/chat";
+const REGISTER_URL = "https://vantagehall.vercel.app/api/register";
+const CALLBACK_URL = "https://vantagehall.vercel.app/api/callback-request";
+    const chatMessages = document.getElementById('chatMessages');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const quickReplies = document.getElementById('quickReplies');
+    const typingIndicator = document.getElementById('typingIndicator');
+    const registrationOverlay = document.getElementById('registrationOverlay');
+    const backToMenuBtn = document.getElementById('backToMenuBtn');
+
+    let isProcessing = false, isRegistered = false, userData = {};
+    let currentTopic = null, currentOptionLevel = null, currentSelectedOption = null;
+    let interactionCount = 0, waitingForCallback = false, pendingQuery = '';
+
+    try {
+        if (localStorage.getItem('vhUserRegistered')) {
+            isRegistered = true;
+            userData = JSON.parse(localStorage.getItem('vhUserData'));
+            registrationOverlay.classList.add('hidden');
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            setTimeout(() => addMessage(`Hello ${userData.name}! 👋 Welcome to Vantage Hall! How can I assist you today?`, 'bot'), 300);
+        }
+    } catch(e) {}
+
+    function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+    function validatePhone(phone) { return /^[6-9]\d{9}$/.test(phone); }
+    function validateCallbackPhone(phone) { const c = phone.replace(/\D/g,''); return c.length===10 && /^[6-9]\d{9}$/.test(c); }
+
+    document.getElementById('userDetailsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        document.querySelectorAll('.error-message').forEach(el => el.classList.remove('show'));
+        document.querySelectorAll('input').forEach(el => el.classList.remove('error'));
+        const name = document.getElementById('userName').value.trim();
+        const email = document.getElementById('userEmail').value.trim();
+        const phone = document.getElementById('userPhone').value.trim();
+        let hasError = false;
+        if (!name) { document.getElementById('userName').classList.add('error'); document.getElementById('nameError').classList.add('show'); hasError = true; }
+        if (!email || !validateEmail(email)) { document.getElementById('userEmail').classList.add('error'); document.getElementById('emailError').classList.add('show'); hasError = true; }
+        if (!phone || !validatePhone(phone)) { document.getElementById('userPhone').classList.add('error'); document.getElementById('phoneError').classList.add('show'); hasError = true; }
+        if (hasError) return;
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading-spinner"></span>Processing...';
+        try {
+            const response = await fetch(REGISTER_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name,email,phone}) });
+            const data = await response.json();
+            if (data.success) {
+                userData = {name,email,phone};
+                localStorage.setItem('vhUserRegistered','true');
+                localStorage.setItem('vhUserData', JSON.stringify(userData));
+                isRegistered = true;
+                registrationOverlay.classList.add('hidden');
+                userInput.disabled = false; sendBtn.disabled = false;
+                userInput.focus();
+                setTimeout(() => addMessage(`Hello ${name}! 👋 Welcome to Vantage Hall Girls' Residential School, Dehradun! How can I assist you today?`, 'bot'), 300);
+            } else { alert(data.error || 'Registration failed. Please try again.'); }
+        } catch(err) { alert('Connection error. Please try again.'); }
+        finally { submitBtn.disabled = false; submitBtn.innerHTML = 'Start Chatting 🚀'; }
+    });
+
+    document.getElementById('userPhone').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g,'').slice(0,10); });
+    backToMenuBtn.addEventListener('click', resetToMainMenu);
+
+    function resetToMainMenu() {
+        currentTopic=null; currentOptionLevel=null; currentSelectedOption=null;
+        interactionCount=0; waitingForCallback=false; pendingQuery='';
+        hideBackButton(); showDefaultQuickReplies();
+        addMessage("Back to main menu! How can I help you?", 'bot');
+    }
+
+    function showBackButton() { backToMenuBtn.classList.add('show'); }
+    function hideBackButton() { backToMenuBtn.classList.remove('show'); }
+
+    function showDefaultQuickReplies() {
+        quickReplies.innerHTML = `
+            <button class="back-to-menu-btn" id="backToMenuBtn">⬅️ Back to Menu</button>
+            <button class="quick-reply-btn" data-reply="faq">❓ FAQ</button>
+            <button class="quick-reply-btn" data-reply="emotional">💚 Emotional Support</button>
+            <button class="quick-reply-btn" data-reply="What is the admission process?">📝 Admissions</button>
+            <button class="quick-reply-btn" data-reply="Tell me about fee structure">💰 Fee Structure</button>
+            <button class="quick-reply-btn" data-reply="What are hostel facilities?">🏡 Hostel</button>
+            <button class="quick-reply-btn" data-reply="How can I contact you?">📞 Contact</button>`;
+        document.getElementById('backToMenuBtn').addEventListener('click', resetToMainMenu);
+    }
+
+    async function handleCallbackRequest(callbackNumber) {
+        try {
+            const response = await fetch(CALLBACK_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:userData.name,email:userData.email,phone:userData.phone,query:pendingQuery,callback_number:callbackNumber}) });
+            const data = await response.json();
+            if (data.success) {
+                addMessage(`Thank you! ✅ Callback request received.\n\n📞 We'll call you at: ${callbackNumber}\n\nOur team will reach out within 24 hours!`, 'bot');
+                waitingForCallback=false; pendingQuery=''; showDefaultQuickReplies();
+            } else { addMessage('Sorry, issue occurred. Contact us:\n📞 0135-2776225', 'bot'); }
+        } catch(err) { addMessage('Connection error. Contact us:\n📞 0135-2776225', 'bot'); }
+    }
+
+    async function sendMessage() {
+        const message = userInput.value.trim();
+        if (message==='' || isProcessing) return;
+        if (waitingForCallback) {
+            if (validateCallbackPhone(message)) {
+                addMessage(message, 'user'); userInput.value='';
+                isProcessing=true; typingIndicator.style.display='block';
+                userInput.disabled=true; sendBtn.disabled=true; scrollToBottom();
+                await handleCallbackRequest(message);
+                isProcessing=false; typingIndicator.style.display='none';
+                userInput.disabled=false; sendBtn.disabled=false; userInput.focus();
+            } else {
+                addMessage(message,'user');
+                addMessage('❌ Please enter a valid 10-digit number starting with 6,7,8 or 9.\nExample: 9876543210','bot');
+                userInput.value='';
+            }
+            return;
+        }
+        addMessage(message,'user'); userInput.value='';
+        isProcessing=true; typingIndicator.style.display='block';
+        userInput.disabled=true; sendBtn.disabled=true; scrollToBottom();
+        try {
+            const response = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message, lastTopic:currentTopic, lastOptionLevel:currentOptionLevel, lastSelectedOption:currentSelectedOption}) });
+            const data = await response.json();
+            typingIndicator.style.display='none';
+            if (data.success && data.reply) {
+                addMessage(data.reply,'bot');
+                if (data.requiresCallback) {
+                    waitingForCallback=true; pendingQuery=data.userQuery||message;
+                    quickReplies.innerHTML='<button class="back-to-menu-btn show" id="backToMenuBtn">⬅️ Cancel</button>';
+                    document.getElementById('backToMenuBtn').addEventListener('click',()=>{ waitingForCallback=false; pendingQuery=''; resetToMainMenu(); });
+                } else if (data.hasOptions) {
+                    currentTopic=data.currentTopic; currentOptionLevel=data.optionLevel;
+                    currentSelectedOption=data.selectedOption!==undefined?data.selectedOption:null;
+                    if(data.isFAQMenu||data.isEmotionalMenu) interactionCount++;
+                    if(data.isFAQMenu||data.isEmotionalMenu||interactionCount>0) showBackButton();
+                    if(data.options&&data.options.length>0) showOptionButtons(data.options);
+                } else {
+                    if(!currentTopic){ hideBackButton(); showDefaultQuickReplies(); }
+                }
+            }
+        } catch(err) {
+            typingIndicator.style.display='none';
+            addMessage('Connection error. Contact us:\n📞 0135-2776225\n📧 info@vantagehall.org','bot');
+        } finally {
+            isProcessing=false; userInput.disabled=false; sendBtn.disabled=false; userInput.focus();
+        }
+    }
+
+    function showOptionButtons(options) {
+        quickReplies.innerHTML='';
+        const backBtn=document.createElement('button');
+        backBtn.className='back-to-menu-btn show'; backBtn.textContent='⬅️ Back to Menu';
+        backBtn.addEventListener('click',resetToMainMenu);
+        quickReplies.appendChild(backBtn);
+        options.forEach(option=>{
+            const btn=document.createElement('button');
+            btn.className='quick-reply-btn'; btn.textContent=option.label;
+            btn.onclick=()=>{ userInput.value=option.trigger[0]; sendMessage(); };
+            quickReplies.appendChild(btn);
+        });
+    }
+
+    function addMessage(text,sender) {
+        const messageDiv=document.createElement('div'); messageDiv.className=`message ${sender}`;
+        const contentDiv=document.createElement('div'); contentDiv.className='message-content';
+        const formatted=text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" style="color:#1a7a52;text-decoration:underline;">$1</a>');
+        contentDiv.innerHTML=formatted;
+        messageDiv.appendChild(contentDiv);
+        chatMessages.insertBefore(messageDiv,typingIndicator.parentElement);
+        scrollToBottom();
+    }
+
+    function scrollToBottom() { setTimeout(()=>{ chatMessages.scrollTop=chatMessages.scrollHeight; },100); }
+
+    sendBtn.addEventListener('click',sendMessage);
+    userInput.addEventListener('keypress',(e)=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(); } });
+    quickReplies.addEventListener('click',(e)=>{ if(e.target.classList.contains('quick-reply-btn')){ const reply=e.target.getAttribute('data-reply'); if(reply){ userInput.value=reply; sendMessage(); } } });
+</script>
+</body>
+</html>

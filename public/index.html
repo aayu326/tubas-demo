@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tula's Institute Chatbot</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        /* Chat Toggle Button */
+        .chat-toggle {
+            position: fixed; bottom: 20px; right: 20px;
+            width: 65px; height: 65px; border-radius: 50%;
+            background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            border: none; cursor: pointer;
+            box-shadow: 0 8px 25px rgba(0, 61, 130, 0.5);
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s ease; z-index: 9999;
+        }
+        .chat-toggle:hover { transform: scale(1.1) rotate(5deg); box-shadow: 0 12px 35px rgba(0, 61, 130, 0.6); }
+        .chat-toggle svg { width: 32px; height: 32px; fill: white; }
+        .chat-toggle.active { background: linear-gradient(135deg, #e8502a 0%, #c73d1a 100%); transform: rotate(90deg); }
+        .close-icon { display: none; }
+        .chat-toggle.active .chat-icon { display: none; }
+        .chat-toggle.active .close-icon { display: block; }
+        .chat-toggle::before {
+            content: ''; position: absolute; width: 100%; height: 100%;
+            border-radius: 50%; background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            opacity: 0.3; animation: pulse-ring 2s ease-out infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.3); opacity: 0; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+
+        /* Chat Bubble */
+        .chat-bubble {
+            position: fixed; bottom: 100px; right: 20px;
+            background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            color: white; padding: 14px 18px; border-radius: 20px;
+            border-bottom-right-radius: 4px; font-size: 14px; font-weight: 600;
+            box-shadow: 0 8px 20px rgba(0, 61, 130, 0.4); z-index: 9998;
+            animation: bubbleFloat 3s ease-in-out infinite;
+            display: flex; align-items: center; gap: 10px; max-width: 280px;
+        }
+        .chat-bubble.hidden { display: none; }
+        @keyframes bubbleFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-8px) scale(1.02); }
+        }
+        .wave-emoji { display: inline-block; animation: wave 1.5s ease-in-out infinite; font-size: 20px; }
+        @keyframes wave {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(25deg); }
+            75% { transform: rotate(-15deg); }
+        }
+
+        /* Notification Badge */
+        .notification-badge {
+            position: absolute; top: -8px; right: -8px;
+            background: linear-gradient(135deg, #e8502a 0%, #c73d1a 100%);
+            color: white; width: 26px; height: 26px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: bold; border: 3px solid white;
+            animation: badgePulse 2s ease-in-out infinite;
+            box-shadow: 0 3px 10px rgba(232, 80, 42, 0.4);
+        }
+        @keyframes badgePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+
+        /* Chat Container */
+        .chat-container {
+            position: fixed; bottom: 100px; right: 20px;
+            width: 410px; height: 620px; background: white;
+            border-radius: 20px; box-shadow: 0 15px 60px rgba(0, 0, 0, 0.3);
+            display: none; flex-direction: column; overflow: hidden;
+            z-index: 9999; animation: slideUpScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .chat-container.active { display: flex; }
+        @keyframes slideUpScale {
+            from { opacity: 0; transform: translateY(30px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Chat Header */
+        .chat-header {
+            background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            color: white; padding: 16px 20px;
+            display: flex; align-items: center; gap: 14px;
+            box-shadow: 0 4px 15px rgba(0, 61, 130, 0.3); flex-shrink: 0;
+            position: relative; overflow: hidden;
+        }
+        .chat-header::before {
+            content: ''; position: absolute; top: -50%; right: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+            animation: headerShine 4s ease-in-out infinite;
+        }
+        @keyframes headerShine {
+            0%, 100% { transform: translate(-50%, -50%); }
+            50% { transform: translate(0%, 0%); }
+        }
+        .chat-header-avatar {
+            width: 52px; height: 52px; border-radius: 12px;
+            background: white; display: flex; align-items: center;
+            justify-content: center; overflow: hidden; flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            border: 3px solid rgba(255, 255, 255, 0.25); position: relative; z-index: 1;
+        }
+        .chat-header-avatar img { width: 100%; height: 100%; object-fit: contain; }
+        .chat-header-info { flex: 1; position: relative; z-index: 1; }
+        .chat-header-info h3 { font-size: 16px; margin-bottom: 3px; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .chat-header-info .subtitle { font-size: 11px; opacity: 0.85; }
+        .chat-header-info p { font-size: 12px; opacity: 0.95; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+        .status-dot {
+            width: 8px; height: 8px; background: #4ade80; border-radius: 50%;
+            display: inline-block; animation: statusBlink 2s ease-in-out infinite;
+            box-shadow: 0 0 8px #4ade80;
+        }
+        @keyframes statusBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .ai-badge {
+            background: rgba(232, 80, 42, 0.85); backdrop-filter: blur(10px);
+            padding: 3px 10px; border-radius: 14px; font-size: 10px;
+            font-weight: bold; margin-top: 4px; display: inline-block;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Registration Overlay */
+        .registration-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; z-index: 10; display: flex;
+            flex-direction: column; overflow-y: auto;
+        }
+        .registration-overlay.hidden { display: none; }
+        .registration-header {
+            background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            color: white; padding: 28px 20px; text-align: center;
+            flex-shrink: 0; position: relative; overflow: hidden;
+        }
+        .registration-header::before {
+            content: '🎓'; position: absolute; font-size: 80px;
+            opacity: 0.08; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+        }
+        .registration-header .logo-wrap {
+            width: 60px; height: 60px; background: white; border-radius: 12px;
+            margin: 0 auto 14px; overflow: hidden; display: flex;
+            align-items: center; justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .registration-header .logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
+        .registration-header h2 { font-size: 20px; margin-bottom: 6px; position: relative; z-index: 1; }
+        .registration-header p { font-size: 13px; opacity: 0.9; position: relative; z-index: 1; }
+        .registration-form { flex: 1; padding: 24px; overflow-y: auto; background: #fafafa; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; color: #333; }
+        .form-group label .required { color: #e8502a; }
+        .form-group input {
+            width: 100%; padding: 12px 14px; border: 2px solid #e5e5e5;
+            border-radius: 10px; font-size: 14px; transition: all 0.3s ease;
+            outline: none; background: white;
+        }
+        .form-group input:focus {
+            border-color: #003d82; box-shadow: 0 0 0 4px rgba(0, 61, 130, 0.1);
+            transform: translateY(-1px);
+        }
+        .form-group input.error { border-color: #e8502a; animation: shake 0.5s ease; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        .error-message { color: #e8502a; font-size: 12px; margin-top: 5px; display: none; }
+        .error-message.show { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+        .submit-btn {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            color: white; border: none; border-radius: 10px;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: all 0.3s ease; margin-top: 8px;
+            box-shadow: 0 4px 15px rgba(0, 61, 130, 0.4);
+        }
+        .submit-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0, 61, 130, 0.5); }
+        .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .form-note { text-align: center; font-size: 12px; color: #666; margin-top: 14px; padding: 12px; background: white; border-radius: 10px; border: 1px solid #e5e5e5; }
+        .otp-mail-notice {
+            display: none; background: linear-gradient(135deg, #f0f8ff, #e8f0fd);
+            border: 1.5px solid #003d82; border-radius: 10px; padding: 12px 16px;
+            margin-bottom: 14px; font-size: 13px; color: #003d82;
+            font-weight: 600; text-align: center; animation: fadeIn 0.4s ease;
+        }
+        .otp-mail-notice.show { display: block; }
+        .loading-spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid white; border-top-color: transparent;
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Chat Messages */
+        .chat-messages {
+            flex: 1; padding: 16px; overflow-y: auto;
+            background: linear-gradient(to bottom, #f5f7fb 0%, #ffffff 100%);
+            -webkit-overflow-scrolling: touch;
+        }
+        .chat-messages::-webkit-scrollbar { width: 5px; }
+        .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 10px; }
+        .chat-messages::-webkit-scrollbar-thumb:hover { background: #003d82; }
+        .message { margin-bottom: 12px; display: flex; animation: messageSlide 0.4s ease; }
+        @keyframes messageSlide { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .message.bot { justify-content: flex-start; }
+        .message.user { justify-content: flex-end; }
+        .message-content {
+            max-width: 78%; padding: 11px 15px; border-radius: 18px;
+            font-size: 13.5px; line-height: 1.6; word-wrap: break-word;
+        }
+        .message.bot .message-content {
+            background: white; color: #333; border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); border: 1px solid #f0f0f0;
+        }
+        .message.user .message-content {
+            background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            color: white; border-bottom-right-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 61, 130, 0.4);
+        }
+
+        /* Quick Replies */
+        .quick-replies {
+            padding: 10px 14px; background: white;
+            border-top: 1px solid #e8e8e8;
+            display: flex; gap: 7px; flex-wrap: wrap;
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+            flex-shrink: 0; max-height: 95px;
+        }
+        .quick-replies::-webkit-scrollbar { height: 0; }
+        .quick-reply-btn {
+            padding: 7px 13px;
+            background: linear-gradient(135deg, #f5f7fb 0%, #ffffff 100%);
+            border: 2px solid #e5e5e5; border-radius: 20px;
+            font-size: 12px; cursor: pointer; transition: all 0.3s ease;
+            white-space: nowrap; flex-shrink: 0; font-weight: 500; color: #333;
+        }
+        .quick-reply-btn:hover {
+            background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            color: white; border-color: transparent;
+            transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 61, 130, 0.35);
+        }
+        .back-to-menu-btn {
+            padding: 7px 13px;
+            background: linear-gradient(135deg, #e8502a 0%, #c73d1a 100%);
+            border: none; border-radius: 20px; color: white;
+            font-size: 12px; cursor: pointer; transition: all 0.3s ease;
+            white-space: nowrap; flex-shrink: 0; font-weight: 600; display: none;
+        }
+        .back-to-menu-btn.show { display: inline-block; }
+        .back-to-menu-btn:hover {
+            background: linear-gradient(135deg, #c73d1a 0%, #a32e0e 100%);
+            transform: translateY(-2px); box-shadow: 0 4px 12px rgba(232, 80, 42, 0.5);
+        }
+
+        /* Chat Input */
+        .chat-input {
+            padding: 12px 14px; background: white;
+            border-top: 1px solid #e8e8e8;
+            display: flex; gap: 10px; align-items: center; flex-shrink: 0;
+        }
+        .chat-input input {
+            flex: 1; padding: 11px 15px; border: 2px solid #e5e5e5;
+            border-radius: 24px; font-size: 13.5px; outline: none;
+            transition: all 0.3s ease; background: #f7f9fc;
+        }
+        .chat-input input:focus { border-color: #003d82; background: white; box-shadow: 0 0 0 3px rgba(0, 61, 130, 0.1); }
+        .chat-input input:disabled { background: #f5f5f5; cursor: not-allowed; }
+        .chat-input button {
+            width: 42px; height: 42px; border-radius: 50%;
+            background: linear-gradient(135deg, #003d82 0%, #001f42 100%);
+            border: none; cursor: pointer; display: flex;
+            align-items: center; justify-content: center;
+            transition: all 0.3s ease; flex-shrink: 0;
+            box-shadow: 0 3px 10px rgba(0, 61, 130, 0.4);
+        }
+        .chat-input button:hover:not(:disabled) { transform: scale(1.1) rotate(5deg); box-shadow: 0 5px 15px rgba(0, 61, 130, 0.5); }
+        .chat-input button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .chat-input button svg { width: 18px; height: 18px; fill: white; }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: none; padding: 12px 16px; background: white;
+            border-radius: 18px; border-bottom-left-radius: 4px;
+            max-width: 70px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f0f0f0;
+        }
+        .typing-indicator span {
+            height: 8px; width: 8px; background: #003d82;
+            border-radius: 50%; display: inline-block; margin-right: 4px;
+            animation: typing 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; margin-right: 0; }
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.7; }
+            30% { transform: translateY(-10px); opacity: 1; }
+        }
+
+        /* Orange accent bar at bottom */
+        .chat-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #e8502a, #f4854e, #e8502a);
+            z-index: 1;
+        }
+
+        @media (max-width: 768px) {
+            .chat-container { bottom: 0; right: 0; left: 0; top: 0; width: 100%; height: 100%; border-radius: 0; max-height: 100vh; }
+            .chat-bubble { bottom: 95px; right: 15px; max-width: 220px; font-size: 13px; padding: 12px 14px; }
+            .chat-toggle { bottom: 15px; right: 15px; width: 60px; height: 60px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="chat-bubble" id="chatBubble">
+        <span class="wave-emoji">👋</span>
+        Ask me about Admissions, Fees &amp; More!
+    </div>
+
+    <button class="chat-toggle" id="chatToggle">
+        <span class="notification-badge">1</span>
+        <svg viewBox="0 0 24 24" class="chat-icon">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+        </svg>
+        <svg viewBox="0 0 24 24" class="close-icon">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+    </button>
+
+    <div class="chat-container" id="chatContainer">
+
+        <!-- Registration Form Overlay -->
+        <div class="registration-overlay" id="registrationOverlay">
+            <div class="registration-header">
+                <div class="logo-wrap">
+                    <img src="https://tulas.edu.in/_next/static/media/TulasLogo.f88dd71b.png"
+                         alt="Tula's Institute"
+                         onerror="this.parentElement.innerHTML='<span style=font-size:28px>🎓</span>'">
+                </div>
+                <h2>Welcome to Tula's Institute!</h2>
+                <p>Please share your details to start chatting</p>
+            </div>
+            <div class="registration-form">
+                <form id="userDetailsForm">
+                    <div class="form-group">
+                        <label for="userName">Your Name <span class="required">*</span></label>
+                        <input type="text" id="userName" placeholder="Enter your full name" required>
+                        <div class="error-message" id="nameError">Please enter your name</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="userEmail">Email Address <span class="required">*</span></label>
+                        <input type="email" id="userEmail" placeholder="example@email.com" required>
+                        <div class="error-message" id="emailError">Please enter a valid email</div>
+                    </div>
+
+                    <div class="otp-mail-notice" id="otpMailNotice">
+                        📧 Please check your mail and enter the 6-digit OTP below
+                    </div>
+
+                    <div class="form-group" id="otpGroup" style="display:none;">
+                        <label for="otpInput">
+                            Enter OTP <span class="required">*</span>
+                            <span id="otpTimer" style="color:#e8502a;font-size:11px;margin-left:8px;font-weight:normal;"></span>
+                        </label>
+                        <input type="text" id="otpInput" placeholder="• • • • • •" maxlength="6"
+                            style="letter-spacing:8px;font-size:20px;font-weight:700;text-align:center;width:100%;">
+                        <div class="error-message" id="otpError"></div>
+                        <div id="otpSuccess" style="color:#16a34a;font-size:12px;margin-top:6px;display:none;">
+                            ✅ Email verified successfully!
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="userPhone">Phone Number <span class="required">*</span></label>
+                        <input type="tel" id="userPhone" placeholder="10-digit mobile number" required maxlength="10">
+                        <div class="error-message" id="phoneError">Please enter a valid 10-digit number</div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        Verify &amp; Start Chatting 🚀
+                    </button>
+
+                    <div class="form-note" id="formNote">
+                        🔒 Your details are safe with us. NAAC A+ Institute — Dehradun.
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Chat Header -->
+        <div class="chat-header">
+            <div class="chat-header-avatar">
+                <img src="https://tulas.edu.in/_next/static/media/TulasLogo.f88dd71b.png"
+                     alt="Tula's Institute Logo"
+                     onerror="this.outerHTML='<span style=font-size:26px>🎓</span>'">
+            </div>
+            <div class="chat-header-info">
+                <h3>Tula's Institute</h3>
+                <div class="subtitle" style="color:rgba(255,255,255,0.75);font-size:11px;">The Engineering &amp; Management College</div>
+                <p><span class="status-dot"></span>Online • Ready to help</p>
+                <span class="ai-badge">🤖 AI-POWERED</span>
+            </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                <div class="typing-indicator" id="typingIndicator">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Replies -->
+        <div class="quick-replies" id="quickReplies">
+            <button class="back-to-menu-btn" id="backToMenuBtn">⬅️ Back to Menu</button>
+            <button class="quick-reply-btn" data-reply="faq">❓ FAQ</button>
+            <button class="quick-reply-btn" data-reply="student support">💚 Student Support</button>
+            <button class="quick-reply-btn" data-reply="What is the admission process?">📝 Admissions</button>
+            <button class="quick-reply-btn" data-reply="Tell me about fee structure">💰 Fee Structure</button>
+            <button class="quick-reply-btn" data-reply="Tell me about hostel facilities">🏠 Hostel</button>
+            <button class="quick-reply-btn" data-reply="Tell me about placements">💼 Placements</button>
+            <button class="quick-reply-btn" data-reply="How can I contact you?">📞 Contact</button>
+        </div>
+
+        <!-- Chat Input -->
+        <div class="chat-input">
+            <input type="text" id="userInput" placeholder="Type your message..." disabled>
+            <button id="sendBtn" disabled>
+                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ==============================================
+        // CONFIGURATION
+        // ==============================================
+   const API_URL        = "http://localhost:8000/api/chat";
+const REGISTER_URL   = "http://localhost:8000/api/register";
+const CALLBACK_URL   = "http://localhost:8000/api/callback-request";
+const SEND_OTP_URL   = "http://localhost:8000/api/send-otp";
+const VERIFY_OTP_URL = "http://localhost:8000/api/verify-otp";
+
+        // ==============================================
+        // DOM ELEMENTS
+        // ==============================================
+        const chatToggle         = document.getElementById('chatToggle');
+        const chatContainer      = document.getElementById('chatContainer');
+        const chatBubble         = document.getElementById('chatBubble');
+        const chatMessages       = document.getElementById('chatMessages');
+        const userInput          = document.getElementById('userInput');
+        const sendBtn            = document.getElementById('sendBtn');
+        const quickReplies       = document.getElementById('quickReplies');
+        const typingIndicator    = document.getElementById('typingIndicator');
+        const registrationOverlay = document.getElementById('registrationOverlay');
+        const userDetailsForm    = document.getElementById('userDetailsForm');
+        const submitBtn          = document.getElementById('submitBtn');
+        const backToMenuBtn      = document.getElementById('backToMenuBtn');
+        const userName           = document.getElementById('userName');
+        const userEmail          = document.getElementById('userEmail');
+        const userPhone          = document.getElementById('userPhone');
+        const otpGroup           = document.getElementById('otpGroup');
+        const otpInput           = document.getElementById('otpInput');
+        const otpTimer           = document.getElementById('otpTimer');
+        const otpSuccess         = document.getElementById('otpSuccess');
+        const otpMailNotice      = document.getElementById('otpMailNotice');
+
+        // ==============================================
+        // STATE
+        // ==============================================
+        let isProcessing = false;
+        let isRegistered = false;
+        let userData = {};
+        let currentTopic = null;
+        let currentOptionLevel = null;
+        let currentSelectedOption = null;
+        let interactionCount = 0;
+        let waitingForCallback = false;
+        let pendingQuery = '';
+        let otpVerified = false;
+        let otpSent = false;
+        let otpTimerInterval = null;
+        let isVerifyingOTP = false;
+
+        if (localStorage.getItem('tiUserRegistered')) {
+            isRegistered = true;
+            userData = JSON.parse(localStorage.getItem('tiUserData'));
+        }
+
+        // ==============================================
+        // OTP TIMER
+        // ==============================================
+        function startOTPTimer(seconds) {
+            clearInterval(otpTimerInterval);
+            let remaining = seconds;
+            otpTimerInterval = setInterval(() => {
+                remaining--;
+                const m = Math.floor(remaining / 60);
+                const s = remaining % 60;
+                otpTimer.textContent = `(${m}:${s.toString().padStart(2, '0')})`;
+                if (remaining <= 0) {
+                    clearInterval(otpTimerInterval);
+                    otpTimer.textContent = '(Expired)';
+                    otpTimer.style.color = '#e8502a';
+                }
+            }, 1000);
+        }
+
+        // ==============================================
+        // TOAST
+        // ==============================================
+        function showToast(msg, isError = false) {
+            document.querySelector('.ti-toast')?.remove();
+            const t = document.createElement('div');
+            t.className = 'ti-toast';
+            t.textContent = msg;
+            t.style.cssText = `position:absolute;top:12px;left:50%;transform:translateX(-50%);background:${isError ? '#e8502a' : '#16a34a'};color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 15px rgba(0,0,0,0.2);transition:all 0.3s ease;`;
+            document.querySelector('.registration-overlay').appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        // ==============================================
+        // OTP AUTO-VERIFY
+        // ==============================================
+        otpInput.addEventListener('input', async (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+            const otpErr = document.getElementById('otpError');
+            otpErr.classList.remove('show');
+            otpErr.textContent = '';
+            e.target.style.borderColor = '#e5e5e5';
+            if (otpVerified) { otpVerified = false; otpSuccess.style.display = 'none'; submitBtn.disabled = true; }
+            if (e.target.value.length === 6 && !isVerifyingOTP) {
+                isVerifyingOTP = true;
+                const email = userEmail.value.trim();
+                const currentOTP = e.target.value;
+                try {
+                    const res = await fetch(VERIFY_OTP_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp: currentOTP }) });
+                    const data = await res.json();
+                    if (otpInput.value !== currentOTP) { isVerifyingOTP = false; return; }
+                    if (data.success) {
+                        otpVerified = true;
+                        otpInput.style.borderColor = '#16a34a';
+                        otpSuccess.style.display = 'block';
+                        otpErr.classList.remove('show');
+                        clearInterval(otpTimerInterval);
+                        otpTimer.textContent = '';
+                        submitBtn.innerHTML = 'Verify &amp; Start Chatting 🚀';
+                        submitBtn.disabled = false;
+                    } else {
+                        otpVerified = false;
+                        otpInput.style.borderColor = '#e8502a';
+                        otpErr.textContent = '❗ ' + (data.error || 'Incorrect OTP. Please try again.');
+                        otpErr.classList.add('show');
+                        otpSuccess.style.display = 'none';
+                        submitBtn.disabled = true;
+                        otpInput.classList.add('error');
+                        setTimeout(() => { otpInput.classList.remove('error'); if (!otpVerified) otpInput.style.borderColor = '#e5e5e5'; }, 600);
+                    }
+                } catch (err) {
+                    otpErr.textContent = '❗ Verification failed. Please check connection.';
+                    otpErr.classList.add('show');
+                } finally {
+                    isVerifyingOTP = false;
+                }
+            }
+        });
+
+        // ==============================================
+        // CALLBACK VALIDATION
+        // ==============================================
+        function validateCallbackPhone(phone) {
+            const cleaned = phone.replace(/\D/g, '');
+            return cleaned.length === 10 && /^[6-9]\d{9}$/.test(cleaned);
+        }
+
+        async function handleCallbackRequest(callbackNumber) {
+            try {
+                const response = await fetch(CALLBACK_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: userData.name, email: userData.email, phone: userData.phone, query: pendingQuery, callback_number: callbackNumber })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    addMessage(`Thank you! ✅ Your callback request has been received.\n\n📞 We'll call you at: ${callbackNumber}\n\nOur admissions team will reach out to you shortly!\n\nIs there anything else I can help you with?`, 'bot');
+                    waitingForCallback = false;
+                    pendingQuery = '';
+                    showDefaultQuickReplies();
+                } else {
+                    addMessage('Sorry, there was an issue. Please contact us directly:\n📞 +91-9837983721\n📧 info@tulas.edu.in', 'bot');
+                }
+            } catch (error) {
+                addMessage('Connection error. Please contact us directly:\n📞 +91-9837983721\n📧 info@tulas.edu.in', 'bot');
+            }
+        }
+
+        // ==============================================
+        // BACK TO MENU
+        // ==============================================
+        backToMenuBtn.addEventListener('click', () => { resetToMainMenu(); });
+
+        function resetToMainMenu() {
+            currentTopic = null; currentOptionLevel = null; currentSelectedOption = null;
+            interactionCount = 0; waitingForCallback = false; pendingQuery = '';
+            hideBackButton(); showDefaultQuickReplies();
+            addMessage("Back to main menu! How can I help you? 😊", 'bot');
+        }
+
+        function showBackButton() { backToMenuBtn.classList.add('show'); }
+        function hideBackButton() { backToMenuBtn.classList.remove('show'); }
+
+        function showDefaultQuickReplies() {
+            quickReplies.innerHTML = `
+                <button class="back-to-menu-btn" id="backToMenuBtn">⬅️ Back to Menu</button>
+                <button class="quick-reply-btn" data-reply="faq">❓ FAQ</button>
+                <button class="quick-reply-btn" data-reply="student support">💚 Student Support</button>
+                <button class="quick-reply-btn" data-reply="What is the admission process?">📝 Admissions</button>
+                <button class="quick-reply-btn" data-reply="Tell me about fee structure">💰 Fee Structure</button>
+                <button class="quick-reply-btn" data-reply="Tell me about hostel facilities">🏠 Hostel</button>
+                <button class="quick-reply-btn" data-reply="Tell me about placements">💼 Placements</button>
+                <button class="quick-reply-btn" data-reply="How can I contact you?">📞 Contact</button>
+            `;
+            document.getElementById('backToMenuBtn').addEventListener('click', resetToMainMenu);
+        }
+
+        // ==============================================
+        // TOGGLE CHAT
+        // ==============================================
+        chatToggle.addEventListener('click', () => {
+            chatContainer.classList.toggle('active');
+            chatToggle.classList.toggle('active');
+            if (chatContainer.classList.contains('active')) {
+                chatBubble.classList.add('hidden');
+                hideBadge();
+                if (isRegistered) {
+                    registrationOverlay.classList.add('hidden');
+                    userInput.disabled = false; sendBtn.disabled = false;
+                    userInput.focus();
+                    if (!localStorage.getItem('tiWelcomeShown')) {
+                        setTimeout(() => {
+                            addMessage(`Hello ${userData.name}! 👋 Welcome to Tula's Institute, Dehradun!\n\nI'm your AI assistant and I can help you with:\n📝 Admissions & Eligibility\n💰 Fee Structure & Scholarships\n💼 Placements & Career\n🏠 Hostel & Campus Life\n📚 Courses & Programs\n\nHow can I assist you today? 🎓`, 'bot');
+                            localStorage.setItem('tiWelcomeShown', 'true');
+                        }, 300);
+                    }
+                } else {
+                    registrationOverlay.classList.remove('hidden');
+                    userName.focus();
+                }
+            } else {
+                chatBubble.classList.remove('hidden');
+            }
+        });
+
+        // ==============================================
+        // FORM VALIDATION
+        // ==============================================
+        function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+        function validatePhone(phone) { return /^[6-9]\d{9}$/.test(phone); }
+
+        // ==============================================
+        // REGISTRATION FORM SUBMIT
+        // ==============================================
+        userDetailsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!otpSent) {
+                document.querySelectorAll('.error-message').forEach(el => el.classList.remove('show'));
+                document.querySelectorAll('input').forEach(el => el.classList.remove('error'));
+                const name = userName.value.trim();
+                const email = userEmail.value.trim();
+                const phone = userPhone.value.trim();
+                let hasError = false;
+                if (!name) { userName.classList.add('error'); document.getElementById('nameError').classList.add('show'); hasError = true; }
+                if (!email || !validateEmail(email)) { userEmail.classList.add('error'); const ee = document.getElementById('emailError'); ee.textContent = !email ? 'Please enter your email' : 'Please enter a valid email'; ee.classList.add('show'); hasError = true; }
+                if (!phone || !validatePhone(phone)) { userPhone.classList.add('error'); const pe = document.getElementById('phoneError'); pe.textContent = !phone ? 'Please enter your phone number' : 'Please enter a valid 10-digit number'; pe.classList.add('show'); hasError = true; }
+                if (hasError) return;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="loading-spinner"></span>Sending OTP...';
+                try {
+                    const res = await fetch(SEND_OTP_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+                    const data = await res.json();
+                    if (data.success) {
+                        otpSent = true;
+                        otpGroup.style.display = 'block';
+                        otpMailNotice.classList.add('show');
+                        document.getElementById('formNote').textContent = '🔒 OTP sent to your email. Valid for 2 minutes.';
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = 'Verify &amp; Start Chatting 🚀';
+                        userName.disabled = true; userEmail.disabled = true; userPhone.disabled = true;
+                        startOTPTimer(120);
+                        otpInput.focus();
+                    } else {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = 'Verify &amp; Start Chatting 🚀';
+                        showToast('❌ ' + (data.error || 'Failed to send OTP. Please try again.'), true);
+                    }
+                } catch (err) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Verify &amp; Start Chatting 🚀';
+                    showToast('❌ Connection error. Please try again.', true);
+                }
+                return;
+            }
+
+            if (!otpVerified) {
+                const otpErr = document.getElementById('otpError');
+                otpErr.textContent = '❗ Please verify your OTP first.';
+                otpErr.classList.add('show');
+                return;
+            }
+
+            const name = userName.value.trim();
+            const email = userEmail.value.trim();
+            const phone = userPhone.value.trim();
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading-spinner"></span>Processing...';
+            try {
+                const response = await fetch(REGISTER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, phone }) });
+                const data = await response.json();
+                if (data.success) {
+                    userData = { name, email, phone };
+                    localStorage.setItem('tiUserRegistered', 'true');
+                    localStorage.setItem('tiUserData', JSON.stringify(userData));
+                    isRegistered = true;
+                    registrationOverlay.classList.add('hidden');
+                    userInput.disabled = false; sendBtn.disabled = false; userInput.focus();
+                    setTimeout(() => {
+                        addMessage(`Hello ${name}! 👋 Welcome to Tula's Institute, Dehradun!\n\nI'm your AI assistant. I can help you with:\n📝 Admissions & Eligibility\n💰 Fee Structure & Scholarships\n💼 Placements & Career\n🏠 Hostel & Campus Life\n📚 Courses & Programs\n\nHow can I assist you today? 🎓`, 'bot');
+                        localStorage.setItem('tiWelcomeShown', 'true');
+                    }, 300);
+                } else {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Verify &amp; Start Chatting 🚀';
+                    showToast('❌ ' + (data.error || 'Registration failed. Please try again.'), true);
+                }
+            } catch (error) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Verify &amp; Start Chatting 🚀';
+                showToast('❌ Connection error. Please check your internet and try again.', true);
+            }
+        });
+
+        userPhone.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); });
+
+        // ==============================================
+        // SEND MESSAGE
+        // ==============================================
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '' || isProcessing) return;
+
+            if (waitingForCallback) {
+                if (validateCallbackPhone(message)) {
+                    addMessage(message, 'user'); userInput.value = '';
+                    isProcessing = true; typingIndicator.style.display = 'block';
+                    userInput.disabled = true; sendBtn.disabled = true; scrollToBottom();
+                    await handleCallbackRequest(message);
+                    isProcessing = false; typingIndicator.style.display = 'none';
+                    userInput.disabled = false; sendBtn.disabled = false; userInput.focus();
+                    return;
+                } else {
+                    addMessage(message, 'user');
+                    addMessage('❌ Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.\n\nExample: 9837983721', 'bot');
+                    userInput.value = ''; return;
+                }
+            }
+
+            addMessage(message, 'user');
+            userInput.value = '';
+            isProcessing = true; typingIndicator.style.display = 'block';
+            userInput.disabled = true; sendBtn.disabled = true; scrollToBottom();
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, lastTopic: currentTopic, lastOptionLevel: currentOptionLevel, lastSelectedOption: currentSelectedOption })
+                });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                typingIndicator.style.display = 'none';
+
+                if (data.success && data.reply) {
+                    addMessage(data.reply, 'bot');
+                    if (data.requiresCallback) {
+                        waitingForCallback = true;
+                        pendingQuery = data.userQuery || message;
+                        quickReplies.innerHTML = '<button class="back-to-menu-btn show" id="backToMenuBtn">⬅️ Cancel</button>';
+                        document.getElementById('backToMenuBtn').addEventListener('click', () => { waitingForCallback = false; pendingQuery = ''; resetToMainMenu(); });
+                    } else if (data.hasOptions) {
+                        currentTopic = data.currentTopic;
+                        currentOptionLevel = data.optionLevel;
+                        currentSelectedOption = data.selectedOption !== undefined ? data.selectedOption : null;
+                        if (data.isFAQMenu || data.isEmotionalMenu) interactionCount++;
+                        if (data.isFAQMenu || data.isEmotionalMenu || interactionCount > 0) showBackButton();
+                        if (data.options && data.options.length > 0) showOptionButtons(data.options);
+                    } else {
+                        if (!currentTopic) { hideBackButton(); showDefaultQuickReplies(); }
+                    }
+                } else {
+                    throw new Error(data.error || 'Invalid response from server');
+                }
+            } catch (error) {
+                typingIndicator.style.display = 'none';
+                const errorMsg = error.message.includes('Failed to fetch')
+                    ? 'Unable to connect to the server. Please check your internet connection.'
+                    : 'Sorry, I encountered an error. Please try again.';
+                addMessage(`${errorMsg}\n\nYou can also contact us directly:\n📞 +91-9837983721\n📧 info@tulas.edu.in\n🌐 tulas.edu.in`, 'bot');
+            } finally {
+                isProcessing = false; userInput.disabled = false; sendBtn.disabled = false; userInput.focus();
+            }
+        }
+
+        // ==============================================
+        // SHOW OPTION BUTTONS
+        // ==============================================
+        function showOptionButtons(options) {
+            const backBtn = backToMenuBtn.cloneNode(true);
+            backBtn.addEventListener('click', resetToMainMenu);
+            quickReplies.innerHTML = '';
+            quickReplies.appendChild(backBtn);
+            options.forEach(option => {
+                const btn = document.createElement('button');
+                btn.className = 'quick-reply-btn';
+                btn.textContent = option.label;
+                btn.onclick = () => { userInput.value = option.trigger[0]; sendMessage(); };
+                quickReplies.appendChild(btn);
+            });
+        }
+
+        // ==============================================
+        // ADD MESSAGE
+        // ==============================================
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            const formattedText = text
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#e8502a;text-decoration:underline;word-break:break-all;">$1</a>');
+            contentDiv.innerHTML = formattedText;
+            messageDiv.appendChild(contentDiv);
+            chatMessages.insertBefore(messageDiv, typingIndicator.parentElement);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() { setTimeout(() => { chatMessages.scrollTop = chatMessages.scrollHeight; }, 100); }
+
+        function hideBadge() {
+            setTimeout(() => {
+                const badge = document.querySelector('.notification-badge');
+                if (badge) badge.style.display = 'none';
+            }, 300);
+        }
+
+        // ==============================================
+        // EVENT LISTENERS
+        // ==============================================
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+        quickReplies.addEventListener('click', (e) => {
+            if (e.target.classList.contains('quick-reply-btn')) {
+                const reply = e.target.getAttribute('data-reply');
+                if (reply) { userInput.value = reply; sendMessage(); }
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && chatContainer.classList.contains('active')) chatToggle.click();
+        });
+
+        setTimeout(() => {
+            if (!localStorage.getItem('tiChatVisited')) {
+                localStorage.setItem('tiChatVisited', 'true');
+            }
+        }, 1000);
+
+        console.log("🎓 Tula's Institute Chatbot — Production Ready ✅");
+    </script>
+</body>
+</html>
